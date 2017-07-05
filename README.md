@@ -78,7 +78,7 @@ exports.main = main;
 __./routes/route2.js__
 ```javascript
 /**
- * Route with $inject. Add 3 nad 4 to db.$list
+ * Route with $inject. Add 3 and 4 to db.$list
  * @param  {Object} services/db.js
  * @param  {Array} array in index.js:4.
  */
