@@ -1,16 +1,15 @@
-README.md
 # Eloader #
 
 Loads directory modules and injects dependencies.
 
 ## Install
-```
-* Posting, please wait*
+```shell
+$ npm install eloader --save-dev
 ```
 
 ## Usage
 
-index.js
+__index.js__
 ```javascript
 const load = require('eloader');
 const db = require('./services/db.js');
@@ -24,7 +23,7 @@ load.add('db', db)
 	.run(__dirname + '\\routes\\');
 ```
 
-./services/db.js
+__./services/db.js__
 ```javascript
 /**
  * List itens.
@@ -56,13 +55,13 @@ exports.add = add;
 exports.list = list;
 ```
 
-./routes/route1.js
+__./routes/route1.js__
 ```javascript
 /**
  * Route without $inject
- * @param  {object} Equivalent require('fs');
- * @param  {object} services/db.js
- * @param  {array}  Array in index.js:4.
+ * @param  {Object} Equivalent require('fs');
+ * @param  {Object} services/db.js
+ * @param  {Array}  Array in index.js:4.
  */
 let main = function (fs, db, num) {
 	
@@ -76,12 +75,12 @@ let main = function (fs, db, num) {
 exports.main = main;
 ```
 
-./routes/route2.js
+__./routes/route2.js__
 ```javascript
 /**
  * Route with $inject. Add 3 nad 4 to db.$list
- * @param  {object} services/db.js
- * @param  {array} array in index.js:4.
+ * @param  {Object} services/db.js
+ * @param  {Array} array in index.js:4.
  */
 let main = function (db, fromInject) {
 
