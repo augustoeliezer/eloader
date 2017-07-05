@@ -1,0 +1,13 @@
+{
+  "name": "eloader",
+  "version": "1.0.0",
+  "description": "Loads directory modules and injects dependencies.",
+  "main": "index.js",
+  "keywords": [
+    "nodejs",
+    "load",
+    "eloader"
+  ],
+  "author": "Eliézer Augusto de Moraes Andrade",
+  "license": "MIT"
+}
