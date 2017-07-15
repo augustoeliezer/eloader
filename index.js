@@ -1,20 +1,30 @@
 /**
  * 	@description Loads directory modules and injects dependencies.
  * 	@author Eliézer Augusto de Moraes Andrade
- * 	@version 1.0.0
+ * 	@version 1.1.1
  */
 
 const fs = require('fs');
+const path = require('path');
+const Cache = require('./Cache.js');
 
+/**
+ * Regex to get function params.
+ * @type {RegExp}
+ */
 const STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
 const ARGUMENT_NAMES = /([^\s,]+)/g;
 
-/**
- * @private
- * @description Keep 
- * @type {Array}
- */
 let $$cache = {};
+let $$routeDirs = [];
+let $$serviceDirs = [];
+
+//TODO: Separate when will look for subdir by routes and services.
+//TODO: Create a .ignore
+let $includeDirs = {
+	routes : true,
+	services : true
+};
 
 /**
  * @public
@@ -32,28 +42,63 @@ let fallback = function (path, err) {
 
 /**
  * @public
- * @description Add a personal object istance to cache. 
+ * @description Add a personal object istance to cache. Now warning if try overwrite an object.
  * @param       {String} Dependency name. 
  * @param       {Object} Dependency isntance.
  * @return      {Object} Eloader instance.
- * @throws 		{Exception} If module name already exists.
+ * @throws 		{Exception} If name are not present.
+ * @throws 		{Exception} If name already exists as another node module.
  */
 let add = function (name, object) {
 
-	try {
-		// [Warning] Can't be a module from node or node_modules. Example: 'fs'
-		if (require.resolve(name)) {
+	addObject(name, object);
 
-			throw 'Module already exists';
-		}
-	} catch (err) {
+	return this;
+}
 
-		if (object != null) {
+/**
+ * @description Store an object to be injected. Name can't be equal node modules. (Including installed packages).
+ * @param 		{String} Name to be used in injection.
+ * @return 		{Object} Eloader instance.
+ * @throws 		{Exception} If name are not present.
+ * @throws 		{Exception} If name already exists as another node module.
+ */
+let addObject = function (name, object) {
+	
+	if (!name) throw 'Name is required!';
+	if (isNodeModule(name)) throw 'This module ['+ name +'] already exists in node!';
+	if ($$cache[name]) return console.warn( 'Name ['+ name +'] already in use!');
 
-			$$cache[name] = object;
-		}
-	}
+	$$cache[name] = new Cache(object);
 
+	return this;
+}
+
+/**
+ * @public
+ * @description Add a directory of routes.
+ * @param 		{String} Route directory.
+ * @return 		{Object} Eloader instance.
+ * @throws 		{Exception} If param is not a directory.
+ */
+let addRoutes = function (dir) {
+
+	dir = resolve(dir);
+	$$routeDirs.push(dir);
+	return this;
+}
+
+/**
+ * @public
+ * @description Add a directory with modules to be used as service. Modules needs exports $name to be injected.
+ * @param {String} Dependency directory
+ * @return {Object} Eloader instance.
+ * @throws {Exception} If param is not a directory.
+ */
+let addServices = function (dir) {
+
+	dir = resolve(dir);
+	$$serviceDirs.push(dir);
 	return this;
 }
 
@@ -62,6 +107,7 @@ let add = function (name, object) {
  * @description Gets the instance in cache or from require.
  * @param       {String} Dependency name. Can be node module.
  * @return      {Object} Dependency instance. If node_module or node, the require of this.
+ * @throws		If cant resolve the name as node module or registred service.
  */
 let get = function (name) {
 
@@ -72,12 +118,12 @@ let get = function (name) {
 	} catch (err) {
 
 		let cache = $$cache[name];
-		if (cache === undefined || cache === null) {
+		if (!cache) {
 
-			throw 'Module ' + name + ' not find!';
+			throw 'Service ' + name + ' not found!';
 		}
 
-		return cache;
+		return cache.get();
 	}
 }
 
@@ -98,16 +144,32 @@ let getParamNames = function (func) {
   return result;
 };
 
+/**
+ * Try resolve a name as node module.
+ * @param  {String} Name of the module.
+ * @return {Boolean} True if exists a module with this name.
+ */
+let isNodeModule = function (name) {
+	try {
+
+		require.resolve(name);
+
+		return true;
+	} catch (err) {
+
+		return false;
+	}
+}
+
 
 /**
  * @public
  * @description If defined $inject get modules from it and execute, else call loadHard.
  * @param       {String} Module path.
- * @param       {Object} Module instance.
  */
-let load = function (path, module) {
+let load = function (path) {
 	let instances = [];
-
+	let module = require(path);
 	if (typeof module.main !== 'function') {
 
 		throw 'Error module without main.';
@@ -149,43 +211,134 @@ let loadHard = function (path, module) {
 }
 
 /**
+ * Load all directories added by addRoutes and addServices
+ * @param {Boolean} Search in sub directories.
+ * @return {[type]} [description]
+ */
+let loadList = function (includeDirs) {
+
+	while ($$serviceDirs.length > 0) {
+
+		let services = searchDir( $$serviceDirs.pop(), includeDirs);
+
+		for (let i = 0; i < services.length; i++) {
+
+			loadService(null, services[i]);
+		}
+	}
+
+	while ($$routeDirs.length > 0) {
+
+		let routes = searchDir($$routeDirs.pop(), includeDirs);
+
+		for (let j = 0; j < routes.length; j++ ) {
+			
+			try {
+				load(routes[j]);
+			} catch (err) {
+				if (fallback(routes[j], err)) return;
+			}
+		}
+	}
+}
+
+
+/**
+ * @private
+ * @description Load service.
+ * @param  {String} name [description]
+ * @param  {String} path [description]
+ * @return {[type]}      [description]
+ */
+let loadService = function (name, path) {
+	
+	let req = require(path);
+
+	name = name || req.$name;
+
+	if (!name) {
+
+		return;
+	}
+
+	$$cache[name] = new Cache(path, true);
+}
+
+/**
+ * @private
+ * @description Resolve and check if is a directory.
+ * @param  {String} Directory.
+ * @return {String} Resolved path.
+ * @throws {Exception} If dir is not a directory.
+ */
+let resolve = function (dir) {
+	
+	dir = path.resolve(dir);
+	if (!fs.statSync(dir).isDirectory()) throw 'Must be a directory! Found: ' + dir;
+	return dir;
+}
+
+/**
  * @public
- * @description Execute search for modules to load.
+ * @description Start to load modules.
  * @param       {String} Initial path to search for files.
  * @optional    {Boolean} Includes directories in search.
  * @return      {Object} Instance of this module.
  */
-let run = function (initialPath, includeDirs) {
+let run = function (path, includeDirs) {
+	
+	if (path) addRoutes(path);
 
-	fs.readdirSync(initialPath).forEach(function(file) {
+	try {
 
-		let path = initialPath+file;
-	    let item = fs.statSync(path);
+		loadList(includeDirs);
+	} catch (err) {
+		
+		fallback('', err);
+	}
 
-	    if (item.isFile() && file.toLowerCase().indexOf('.js') > 0) {
-
-	    	try {
-
-	    		let module = require(path);
-	    		load(path,module);
-	    	} catch (err) {
-
-	    		if (fallback.call(null, path, err)) return this;
-	    	}
-	    } else {
-
-	    	if (includeDirs && item.isDirectory()) {
-
-	    		run(path + '\\', true);
-	    	}
-	    }
-	});
-
-	return this;
+	return this; //Just for retrocompatibility because it needs to load another route dir.
 }
 
-exports.run = run;
-exports.add = add;
-exports.get = get;
-exports.load = load;
-exports.fallback = fallback;
+/**
+ * @private
+ * @description Scan the directory for js files.
+ * @param  {String} Directory.
+ * @return {[type]}     [description]
+ */
+let searchDir = function (dir, includeDirs) {
+	
+	let out = [];
+	let ls = fs.readdirSync(dir);
+
+	for (let i = 0; i < ls.length; i++) {
+
+		let file = path.join(dir,ls[i]);
+		let stat = fs.statSync(file);
+
+		if (stat.isFile() && path.extname(file).toLowerCase() === '.js') {
+			out.push(file);
+		}
+
+		if (stat.isDirectory() && includeDirs) {
+
+			out = out.concat( searchDir(file, includeDirs) );
+			continue;
+		}
+	}
+
+	return out;
+}
+
+//Since 1.0
+module.exports.run = run;
+module.exports.add = add;					//Add Object (Keep to retrocompatibility)
+module.exports.get = get;					//Eloader require version.
+module.exports.load = load;					
+module.exports.fallback = fallback;			//On error loading routes.
+
+//New 1.1
+module.exports.addRoutes = addRoutes;		//Add directory of routes to be loaded on run.
+module.exports.addServices = addServices;	//Add directory of services to be loaded on run.
+module.exports.addObject = addObject;		//Add an Object like add.
+

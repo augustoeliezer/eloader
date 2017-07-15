@@ -1,13 +1,21 @@
 {
   "name": "eloader",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Loads directory modules and injects dependencies.",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/augustoeliezer/eloader.git"
+  },
   "keywords": [
     "nodejs",
     "load",
     "eloader"
   ],
   "author": "Eliézer Augusto de Moraes Andrade",
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/augustoeliezer/eloader/issues"
+  },
+  "homepage": "https://github.com/augustoeliezer/eloader#readme"
 }
