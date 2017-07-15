@@ -76,52 +76,53 @@ If you have to load some route first, add this directory in run.
 
 ## **API**
 
-
 ```add(name, object)```/```addObject(name, object)``` Add an instance of an object.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | name | String | Name to be used in injection. | 
- | object | Object | An object to be used in injection. | 
-
+| Name | Type | Description |
+| --- | --- | --- |
+| name | String | Name to be used in injection. |
+| object | Object | An object to be used in injection. |
 
 ```addServices(directory)``` Add a directory with modules to be used as service.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | directory | String | Path to modules | 
+| Name | Type | Description |
+| --- | --- | --- |
+| directory | String | Path to modules |
+
 **Warning:** Throws error if it is not a directory.
 
 ```addRoutes(directory)``` Add a directory of routes.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | directory | String | Path to modules. | 
+| Name | Type | Description |
+| --- | --- | --- |
+| directory | String | Path to modules. |
 
 **Warning:** Throws error if it is not a directory.
 **Note:** All adds above returns the eloader instance.
 
 ```run(directory, includeSubDirs)``` Start to load modules.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | directory | String | Path to modules. (Routes) | 
- | includeDirs | String | Includes directories in search | 
+| Name | Type | Description |
+| --- | --- | --- |
+| directory | String | Path to modules. (Routes) |
+| includeDirs | String | Includes directories in search |
+
 **Note:** Services is loaded first for the injection.
 **Note:** The last route directory added will be load first. So if you add a directory in ```run()``` this will be executed first.
 
 ```fallback(path, err)``` Called after an error on load any route, or another throw in ```run()```.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | path | String | If on load a route, the path to the route. | 
- | err | Exception | The error | 
+| Name | Type | Description |
+| --- | --- | --- |
+| path | String | If on load a route, the path to the route. |
+| err | Exception | The error |
+
 **Note:** This dont is called if an error throw on add a directory.
 
 ```load(path)``` Load a route
- | Name | Type | Description | 
- | --- | --- | --- | 
- | path | String | Path to module. | 
+| Name | Type | Description |
+| --- | --- | --- |
+| path | String | Path to module. |
 
 ```get(name)``` Like require, but return objects added by addObject.
- | Name | Type | Description | 
- | --- | --- | --- | 
- | name | String | Service name. | 
+| Name | Type | Description |
+| --- | --- | --- |
+| name | String | Service name. |
 
 ## **Author**
 Eliézer Augusto de Moraes Andrade
