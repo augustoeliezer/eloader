@@ -8,8 +8,8 @@ Just add your services modules and run parsing the path of the routes.
 * [Samples](#samples)
 	* [Loading a directory of routes](#loading-a-directory-of-routes)
 	* [Loading a directory of modules](#loading-a-directory-of-modules)
-	* [Simple example](#simple-example)
-	* [Example old](#example-old)
+	* [Simple example](#simple-old)
+	* [Example old](#simple-new)
 * [API](#api)
 * [Events](#events)
 * [Version](#version)
@@ -65,7 +65,7 @@ module.exports.do = func;
 module.exports.$name = 'sum'; //Loader will ignore modules without this.
 ```
 
-### Simple example
+### Simple old
 ```javascript
 const eloader = require('eloader');
 const express = require('express');
@@ -74,12 +74,12 @@ let app = express();
 let options = {debug: false};
 
 eloader.add('options', options)
-	   .add('options', {}) //Fixed in 1.1. Older overwrite if already exists.
-       .add('app', app)
-	   .run('./loginRoute');
+		.add('options', {}) //Fixed in 1.1. Older overwrite if already exists.
+		.add('app', app)
+		.run('./loginRoute');
 ```
 
-### Example old
+### Simple new
 ```javascript
 //From 1.0
 const eloader = require('eloader');
@@ -88,9 +88,9 @@ const express = require('express');
 let options = {debug: false};
 
 eloader.addObject('options', options) //New methods
-	   .addServices('services')	  //This will be loaded first.
-	   .addRoutes('routes')		  //This third
-	   .run('loginRoute');		  //This second
+		.addServices('services')	  //This will be loaded first.
+		.addRoutes('routes')		  //This third
+		.run('loginRoute');		  //This second
 ```
 
 If you have to load some route first, add this directory in run.
