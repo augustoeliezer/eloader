@@ -1,26 +1,29 @@
-/**
- * 	@description Stores Object or Path
- * 	@author Eliézer Augusto de Moraes Andrade
- * 	@version 1.0.0
- */
+class Cache {
 
-let Cache = function (value, isPath) {
-	
-	this.isPath = isPath || false;
-	this.value = value || null;
+	constructor(value, isPath) {
 
-	 /**
-	 * Gets the stored object or require if a path.
-	 * @return {Object} Service instance
+		this.value = value || null;
+		this.isPath = isPath || false;
+	}
+
+	/**
+	 * Gets the object for use as service
+	 * @return {Object} The service
 	 */
-	this.get = function () {
-		
+	get($inject) {
+
+		let out = null;
 		if (this.isPath) {
 
-			return require(this.value);
-		}
+			out = require(this.value);
+		} else {
 
-		return this.value;
+			out = this.value;
+		}
+		
+		if (typeof $inject !== 'function') return out;
+		if (out.$inject) out.$inject = $inject;
+		return out;
 	}
 }
 

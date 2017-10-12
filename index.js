@@ -1,12 +1,28 @@
 /**
  * 	@description Loads directory modules and injects dependencies.
  * 	@author Eliézer Augusto de Moraes Andrade
- * 	@version 1.1.1
+ * 	@version 1.2.0
  */
+
+//TODO: Move eloader to class inheriting Events
 
 const fs = require('fs');
 const path = require('path');
+const Events  = require('events');
+
+const directory = require('./directory.js');
 const Cache = require('./Cache.js');
+
+class EloaderEvents extends Events {
+
+	async ask(event, obj, path) {
+		let res = {stop: false};
+        let t = this.emit(event, obj, res, path);
+        return res;
+	}
+}
+
+const events = new EloaderEvents();
 
 /**
  * Regex to get function params.
@@ -19,15 +35,10 @@ let $$cache = {};
 let $$routeDirs = [];
 let $$serviceDirs = [];
 
-//TODO: Separate when will look for subdir by routes and services.
-//TODO: Create a .ignore
-let $includeDirs = {
-	routes : true,
-	services : true
-};
 
 /**
  * @public
+ * @deprecated Will be removed in future releases. Use eloder.on('run.error')
  * @description Called on throw exception in run. Can be overwritten.
  * @param       {String} Module path.
  * @param       {Exception/String} Error.
@@ -35,8 +46,47 @@ let $includeDirs = {
  */
 let fallback = function (path, err) {
 	
-	console.error('[Error]  ', path,'\n[Details]', err);
 	// By default continue loadind another files.
+	return null; 
+};
+
+/**
+ * Check if will exit on error.
+ * @param  {String/Error} error The error
+ * @return {Boolean} False if error dont stop the process.
+ */
+let throws = function (error, path) {
+	
+	if (!error instanceof Error) {
+		error = new Error(error);
+	}
+
+	//Check for deprecated method.
+	if (path) {
+
+		let res = fallback(path,error);
+		if (res !== null) {
+			console.warn('[Deprecated Error]  ', path,'\n[Details]', error);
+
+			if (res === true) {
+				return process.exit(1);
+			} else {
+
+				return false;
+			}
+		}
+	}
+	
+
+	events.ask('error', error, path).then((res) => {
+
+		if (res.stop) {
+
+			events.emit('warn', 'Stopped.');
+			process.exit(1);
+		}
+	});
+
 	return false;
 };
 
@@ -52,7 +102,6 @@ let fallback = function (path, err) {
 let add = function (name, object) {
 
 	addObject(name, object);
-
 	return this;
 }
 
@@ -60,17 +109,29 @@ let add = function (name, object) {
  * @description Store an object to be injected. Name can't be equal node modules. (Including installed packages).
  * @param 		{String} Name to be used in injection.
  * @return 		{Object} Eloader instance.
- * @throws 		{Exception} If name are not present.
- * @throws 		{Exception} If name already exists as another node module.
+ * @throws		{Exception} If name are not present.
+ * @throws		{Exception} If name already exists as another node module.
  */
 let addObject = function (name, object) {
 	
-	if (!name) throw 'Name is required!';
-	if (isNodeModule(name)) throw 'This module ['+ name +'] already exists in node!';
-	if ($$cache[name]) return console.warn( 'Name ['+ name +'] already in use!');
+	events.emit('info', '[AddObject] => ' + name);
+
+	if (!name) {
+		events.emit('warn','Name is required!');
+		return this;
+	}
+	if (isNodeModule(name)) {
+	
+		events.emit('warn', 'This module ['+ name +'] already exists in node!');
+		return this;
+	}
+	if ($$cache[name]) {
+
+		events.emit('warn', 'Name ['+ name +'] already in use!');
+		return this; //fix
+	} 
 
 	$$cache[name] = new Cache(object);
-
 	return this;
 }
 
@@ -78,27 +139,29 @@ let addObject = function (name, object) {
  * @public
  * @description Add a directory of routes.
  * @param 		{String} Route directory.
+ * @param       {Boolean} True to search inside directories.
  * @return 		{Object} Eloader instance.
  * @throws 		{Exception} If param is not a directory.
  */
-let addRoutes = function (dir) {
+let addRoutes = function (dir, recursive) {
 
-	dir = resolve(dir);
-	$$routeDirs.push(dir);
+	events.emit('info', '[AddRoutes] => ' + dir);
+	$$routeDirs.push(new directory.Route(dir, recursive));
 	return this;
 }
 
 /**
  * @public
  * @description Add a directory with modules to be used as service. Modules needs exports $name to be injected.
- * @param {String} Dependency directory
- * @return {Object} Eloader instance.
- * @throws {Exception} If param is not a directory.
+ * @param       {String} Dependency directory
+ * @param 		{Boolean} True to search inside directories.
+ * @return 		{Object} Eloader instance.
+ * @throws 		{Exception} If param is not a directory.
  */
-let addServices = function (dir) {
+let addServices = function (dir, recursive) {
 
-	dir = resolve(dir);
-	$$serviceDirs.push(dir);
+	events.emit('info', '[AddServices] => ' + dir);
+	$$serviceDirs.push(new directory.Service(dir, recursive));
 	return this;
 }
 
@@ -120,10 +183,11 @@ let get = function (name) {
 		let cache = $$cache[name];
 		if (!cache) {
 
-			throw 'Service ' + name + ' not found!';
+			events.emit('warn','Service ' + name + ' not found!');
+			return null;
 		}
 
-		return cache.get();
+		return cache.get(get);
 	}
 }
 
@@ -161,18 +225,19 @@ let isNodeModule = function (name) {
 	}
 }
 
-
 /**
  * @public
  * @description If defined $inject get modules from it and execute, else call loadHard.
  * @param       {String} Module path.
+ * @return 		{Boolean} True if module loads.
  */
 let load = function (path) {
 	let instances = [];
 	let module = require(path);
 	if (typeof module.main !== 'function') {
 
-		throw 'Error module without main.';
+		events.emit('warn','Module without main.');
+		return false;
 	}
 	//Simple
 	if (Array.isArray(module.$inject) && module.$inject.length > 0) {
@@ -180,6 +245,7 @@ let load = function (path) {
 		for (let i = 0; i < module.$inject.length; i++) {
 
 			let mod = get(module.$inject[i])
+			if (mod === null) return false;
 			
 			instances.push(mod);
 		}
@@ -187,7 +253,7 @@ let load = function (path) {
 		module.main.apply(null, instances);
 	} else {
 		//Hard
-		loadHard(path, module);
+		return loadHard(path, module);
 	}
 	return true;
 }
@@ -204,39 +270,44 @@ let loadHard = function (path, module) {
 	var list = getParamNames(module.main);
 	
 	for (let i = 0; i < list.length; i++) {
-		instances.push(get(list[i]));
+		let mod = get(list[i]);
+		if (mod === null) return false;
+		instances.push(mod);
 	}
 
 	module.main.apply(null, instances);
+	return true;
 }
 
 /**
  * Load all directories added by addRoutes and addServices
  * @param {Boolean} Search in sub directories.
- * @return {[type]} [description]
  */
 let loadList = function (includeDirs) {
 
 	while ($$serviceDirs.length > 0) {
 
-		let services = searchDir( $$serviceDirs.pop(), includeDirs);
+		let services = $$serviceDirs.pop().searchSync(includeDirs);
 
 		for (let i = 0; i < services.length; i++) {
 
-			loadService(null, services[i]);
+			loadService(services[i]);
 		}
 	}
 
 	while ($$routeDirs.length > 0) {
 
-		let routes = searchDir($$routeDirs.pop(), includeDirs);
+		let routes = $$routeDirs.pop().searchSync(includeDirs);
 
 		for (let j = 0; j < routes.length; j++ ) {
 			
 			try {
-				load(routes[j]);
-			} catch (err) {
-				if (fallback(routes[j], err)) return;
+				if (!load(routes[j])) {
+
+					throws('Not loaded ' + routes[j], routes[j]);
+				}
+			} catch(err) {
+				throws(err, routes[j]);
 			}
 		}
 	}
@@ -250,32 +321,19 @@ let loadList = function (includeDirs) {
  * @param  {String} path [description]
  * @return {[type]}      [description]
  */
-let loadService = function (name, path) {
+let loadService = function (path) {
 	
 	let req = require(path);
 
-	name = name || req.$name;
+	let name = req.$name;
 
 	if (!name) {
 
+		events.emit('warn', 'Ignore '+ path);
 		return;
 	}
 
 	$$cache[name] = new Cache(path, true);
-}
-
-/**
- * @private
- * @description Resolve and check if is a directory.
- * @param  {String} Directory.
- * @return {String} Resolved path.
- * @throws {Exception} If dir is not a directory.
- */
-let resolve = function (dir) {
-	
-	dir = path.resolve(dir);
-	if (!fs.statSync(dir).isDirectory()) throw 'Must be a directory! Found: ' + dir;
-	return dir;
 }
 
 /**
@@ -286,7 +344,7 @@ let resolve = function (dir) {
  * @return      {Object} Instance of this module.
  */
 let run = function (path, includeDirs) {
-	
+
 	if (path) addRoutes(path);
 
 	try {
@@ -294,51 +352,27 @@ let run = function (path, includeDirs) {
 		loadList(includeDirs);
 	} catch (err) {
 		
-		fallback('', err);
+		throws(err);
 	}
+
+	events.emit('load', true);
 
 	return this; //Just for retrocompatibility because it needs to load another route dir.
+				 //run('\\routesA') in 1.1 use addRoutes();
+				 //run('\\routesB')
 }
 
-/**
- * @private
- * @description Scan the directory for js files.
- * @param  {String} Directory.
- * @return {[type]}     [description]
- */
-let searchDir = function (dir, includeDirs) {
-	
-	let out = [];
-	let ls = fs.readdirSync(dir);
-
-	for (let i = 0; i < ls.length; i++) {
-
-		let file = path.join(dir,ls[i]);
-		let stat = fs.statSync(file);
-
-		if (stat.isFile() && path.extname(file).toLowerCase() === '.js') {
-			out.push(file);
-		}
-
-		if (stat.isDirectory() && includeDirs) {
-
-			out = out.concat( searchDir(file, includeDirs) );
-			continue;
-		}
-	}
-
-	return out;
-}
-
-//Since 1.0
-module.exports.run = run;
-module.exports.add = add;					//Add Object (Keep to retrocompatibility)
-module.exports.get = get;					//Eloader require version.
-module.exports.load = load;					
-module.exports.fallback = fallback;			//On error loading routes.
+//New 1.2		
+module.exports = events;					//Emits errors, warns and info.
 
 //New 1.1
 module.exports.addRoutes = addRoutes;		//Add directory of routes to be loaded on run.
 module.exports.addServices = addServices;	//Add directory of services to be loaded on run.
 module.exports.addObject = addObject;		//Add an Object like add.
 
+//Since 1.0
+module.exports.run = run;
+module.exports.add = add;					//Add Object (Keep to retrocompatibility)
+module.exports.get = get;					//Like require.
+module.exports.load = load;					
+module.exports.fallback = fallback;			//@deprecated On error loading routes.

@@ -1,6 +1,6 @@
 {
   "name": "eloader",
-  "version": "1.1.1",
+  "version": "1.2",
   "description": "Loads directory modules and injects dependencies.",
   "main": "index.js",
   "repository": {
