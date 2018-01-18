@@ -7,8 +7,24 @@ class Directory {
 
 	constructor ($path = '', $recursive) {
 		this.type = 'route';
-		this.path = resolve($path);
+		this.check($path);
 		this.recursive = $recursive || false;
+	}
+
+	/**
+	 * @private
+	 * @description Resolve and check if is a directory.
+	 * @param  {String} Directory.
+	 * @return {String} Resolved path. False if dir is not a directory or not exists.
+	 */
+	check(dir) {
+		dir = path.resolve(dir);
+		if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+			
+			return this.path = dir;
+		}
+
+		return this.path = undefined;
 	}
 
 	searchSync(recursive, subDir) {
@@ -67,24 +83,6 @@ class Service extends Directory {
 		super($path, recursive);
 		this.type = 'service';
 	}
-}
-
-/**
- * @private
- * @description Resolve and check if is a directory.
- * @param  {String} Directory.
- * @return {String} Resolved path.
- * @throws {Exception} If dir is not a directory.
- */
-let resolve = function (dir) {
-	
-	dir = path.resolve(dir);
-	let t = fs.statSync(dir).isDirectory();
-	if (!t) {
-
-		return $$error('Must be a directory! Found: ' + dir);
-	}
-	return dir;
 }
 
 module.exports.Route = Route;

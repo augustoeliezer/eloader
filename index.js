@@ -1,7 +1,7 @@
 /**
  * 	@description Loads directory modules and injects dependencies.
  * 	@author Eliézer Augusto de Moraes Andrade
- * 	@version 1.2.0
+ * 	@version 1.3.2
  */
 
 //TODO: Move eloader to class inheriting Events
@@ -96,8 +96,6 @@ let throws = function (error, path) {
  * @param       {String} Dependency name. 
  * @param       {Object} Dependency isntance.
  * @return      {Object} Eloader instance.
- * @throws 		{Exception} If name are not present.
- * @throws 		{Exception} If name already exists as another node module.
  */
 let add = function (name, object) {
 
@@ -109,12 +107,10 @@ let add = function (name, object) {
  * @description Store an object to be injected. Name can't be equal node modules. (Including installed packages).
  * @param 		{String} Name to be used in injection.
  * @return 		{Object} Eloader instance.
- * @throws		{Exception} If name are not present.
- * @throws		{Exception} If name already exists as another node module.
  */
 let addObject = function (name, object) {
 	
-	events.emit('info', '[AddObject] => ' + name);
+	events.emit('info', '[AddObject  ] => ' + name);
 
 	if (!name) {
 		events.emit('warn','Name is required!');
@@ -128,7 +124,7 @@ let addObject = function (name, object) {
 	if ($$cache[name]) {
 
 		events.emit('warn', 'Name ['+ name +'] already in use!');
-		return this; //fix
+		return this;
 	} 
 
 	$$cache[name] = new Cache(object);
@@ -141,12 +137,12 @@ let addObject = function (name, object) {
  * @param 		{String} Route directory.
  * @param       {Boolean} True to search inside directories.
  * @return 		{Object} Eloader instance.
- * @throws 		{Exception} If param is not a directory.
  */
 let addRoutes = function (dir, recursive) {
 
-	events.emit('info', '[AddRoutes] => ' + dir);
-	$$routeDirs.push(new directory.Route(dir, recursive));
+	events.emit('info', '[AddRoutes  ] => ' + dir);
+	let route = new directory.Route(dir, recursive);
+	if (route.path) $$routeDirs.push(route);
 	return this;
 }
 
@@ -156,12 +152,16 @@ let addRoutes = function (dir, recursive) {
  * @param       {String} Dependency directory
  * @param 		{Boolean} True to search inside directories.
  * @return 		{Object} Eloader instance.
- * @throws 		{Exception} If param is not a directory.
  */
 let addServices = function (dir, recursive) {
 
 	events.emit('info', '[AddServices] => ' + dir);
-	$$serviceDirs.push(new directory.Service(dir, recursive));
+	let service = new directory.Service(dir, recursive);
+	if (service.path) {
+		$$serviceDirs.push(service);
+	} else {
+		events.emit('warn', '[Not found  ] => ' + dir);
+	}
 	return this;
 }
 
@@ -170,9 +170,8 @@ let addServices = function (dir, recursive) {
  * @description Gets the instance in cache or from require.
  * @param       {String} Dependency name. Can be node module.
  * @return      {Object} Dependency instance. If node_module or node, the require of this.
- * @throws		If cant resolve the name as node module or registred service.
  */
-let get = function (name) {
+let get = function (name, list) {
 
 	try {
 
@@ -187,7 +186,53 @@ let get = function (name) {
 			return null;
 		}
 
+		if (cache.isClass ) {
+
+			return getClass(name, cache, list);
+		}
+
 		return cache.get(get);
+	}
+}
+
+/**
+ * 
+ * @description Get or instantiate a class.
+ * @param 		{Cache} cache The source cache.
+ * @param 		{Array} list  List previous dependencies.
+ * @return 		{Object}      An instance or null if error.
+ */
+let getClass = function (name, cache, list) {
+	
+	if (typeof cache.value !== 'string') {
+
+		return cache.value;
+	} else {
+
+		let tmp = cache.get(get);
+		let dependency = getParamNames(tmp);
+		let inject = [];
+
+		list = list || [];
+
+		list.push(name);
+
+		let check = list.some(function (ls) {
+			if (dependency.indexOf(ls) >= 0) {
+
+				throws('error', 'Circular reference: ' + list.join(' => ') + ' => ' + ls);
+				return true;
+			}
+			return false;
+		});
+
+		if (check) return null;
+
+		for (let i = 0; i < dependency.length; i++) {
+			inject.push(get(dependency[i], list));
+		}
+
+		return $$cache[name].value = initialize(cache.require(), inject);
 	}
 }
 
@@ -209,9 +254,10 @@ let getParamNames = function (func) {
 };
 
 /**
- * Try resolve a name as node module.
- * @param  {String} Name of the module.
- * @return {Boolean} True if exists a module with this name.
+ * @private
+ * @description Try resolve a name as node module.
+ * @param  		{String} Name of the module.
+ * @return 		{Boolean} True if exists a module with this name.
  */
 let isNodeModule = function (name) {
 	try {
@@ -220,6 +266,48 @@ let isNodeModule = function (name) {
 
 		return true;
 	} catch (err) {
+
+		return false;
+	}
+}
+
+/**
+ * @private
+ * @description Check if is class
+ * @param 		{Function}  fn A function
+ * @return 		{Boolean}   True if its a class.
+ */
+let isClass = function(fn) {
+  return /^\s*class\s+/.test(fn.toString());
+}
+
+/**
+ * @private
+ * @description Initialize a route/service
+ * @param 		{Function}	fn  The route to load.
+ * @param 		{Array}		arr List dependency,
+ * @return 		{Boolean/Object} If class return instance, else true for success.
+ */
+let initialize = function (fn, arr) {
+	
+	try {
+
+		if (typeof fn === 'function') {
+
+			if (isClass(fn)) {
+
+				return new (Function.prototype.bind.apply(fn, [null].concat(arr)))();
+
+			} else {
+
+				fn.apply(null, arr);
+			}
+			return true;
+		} else {
+
+			return false;
+		}
+	} catch(err) {
 
 		return false;
 	}
@@ -250,7 +338,7 @@ let load = function (path) {
 			instances.push(mod);
 		}
 
-		module.main.apply(null, instances);
+		initialize(module.main, instances);
 	} else {
 		//Hard
 		return loadHard(path, module);
@@ -275,7 +363,7 @@ let loadHard = function (path, module) {
 		instances.push(mod);
 	}
 
-	module.main.apply(null, instances);
+	initialize(module.main, instances);
 	return true;
 }
 
@@ -313,7 +401,6 @@ let loadList = function (includeDirs) {
 	}
 }
 
-
 /**
  * @private
  * @description Load service.
@@ -329,11 +416,11 @@ let loadService = function (path) {
 
 	if (!name) {
 
-		events.emit('warn', 'Ignore '+ path);
+		events.emit('info', '[Ignore     ] => '+ path);
 		return;
 	}
 
-	$$cache[name] = new Cache(path, true);
+	$$cache[name] = new Cache(path, true, isClass(req));
 }
 
 /**
@@ -358,7 +445,7 @@ let run = function (path, includeDirs) {
 	events.emit('load', true);
 
 	return this; //Just for retrocompatibility because it needs to load another route dir.
-				 //run('\\routesA') in 1.1 use addRoutes();
+				 //run('\\routesA') since 1.1 use addRoutes();
 				 //run('\\routesB')
 }
 

@@ -1,9 +1,10 @@
 class Cache {
 
-	constructor(value, isPath) {
+	constructor(value, isPath, isClass) {
 
 		this.value = value || null;
 		this.isPath = isPath || false;
+		this.isClass = isClass || false;
 	}
 
 	/**
@@ -24,6 +25,18 @@ class Cache {
 		if (typeof $inject !== 'function') return out;
 		if (out.$inject) out.$inject = $inject;
 		return out;
+	}
+
+	/**
+	 * Only for path a module.
+	 * @return {Object} The module required.
+	 */
+	require() {
+		if (this.isPath) {
+			return require(this.value);
+		} else {
+			return null;
+		}
 	}
 }
 

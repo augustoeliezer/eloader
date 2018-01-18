@@ -3,6 +3,8 @@
 Load all  modules in  directory and injects dependencies.
 Just add your services modules and run parsing the path of the routes.
 
+**NEW** Added support to [ES6 class](es6.md).
+
 * [Install](#install)
 * [How to](#how-to)
 * [Samples](#samples)
@@ -184,7 +186,7 @@ eloader.on('error', (err, res, path) => {
 **Note:** Default is false, so its try continue.
 
 ## **[Version](#eloader)**
-1.2.1
+1.3.2
 
 ## **[Author](#eloader)**
 Eliézer Augusto de Moraes Andrade
