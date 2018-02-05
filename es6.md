@@ -25,14 +25,20 @@ class RouteA {
 	}
 }
 
-exports.main = RouteA;
+module.exports.main = RouteA;
+//Optional,may be array of string or a string uring space and/or comma.
+module.exports.$inject = [
+'app',
+'db',
+'error'
+];
 ```
 
 ### **Service**
 ```javascript
-exports = class DataClass {
+module.exports = class DataClass {
 	
-	constructor(error, connection) { //WARNING eloader emits error if detect a circular reference.
+	constructor(error, connection, socketio) { //WARNING eloader emits error if detect a circular reference.
 
 		this.connect(connection).then((query) => {
 			
@@ -48,6 +54,7 @@ exports = class DataClass {
 	}
 }
 
-exporsts.$name = 'db';
+module.exports.$name = 'db';
+module.exports.$inject = 'error,connection socket.io';
 ```
 

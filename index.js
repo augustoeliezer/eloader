@@ -92,7 +92,7 @@ let throws = function (error, path) {
 
 /**
  * @public
- * @description Add a personal object istance to cache. Now warning if try overwrite an object.
+ * @description Add a personal object istance to cache. Emit warn if try overwrite an object.
  * @param       {String} Dependency name. 
  * @param       {Object} Dependency isntance.
  * @return      {Object} Eloader instance.
@@ -238,19 +238,25 @@ let getClass = function (name, cache, list) {
 
 /**
  * @private
- * @description Gets the params of a function.
+ * @description Get the dependencies from module.
  * @param       {Function} A function
  * @return      {Array}	Array of string with the params
+ * May use space or comma or both.
  */
 let getParamNames = function (func) {
 
-  let fnStr = func.toString().replace(STRIP_COMMENTS, '');
-  let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+	if (Array.isArray(func.$inject)) return func.$inject;
+	if(typeof func.$inject === 'string') return func.$inject.match(ARGUMENT_NAMES);
 
-  if(result === null)
+	if (func.main) func = func.main; //To get from route.
+	let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+	let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+	//'inject1 inject2,inject3' = ['inject1', 'inject2', 'inject3']
 
-     result = [];
-  return result;
+	if(result === null)
+
+	result = [];
+	return result;
 };
 
 /**
@@ -315,55 +321,31 @@ let initialize = function (fn, arr) {
 
 /**
  * @public
- * @description If defined $inject get modules from it and execute, else call loadHard.
+ * @description Load a module as route.
  * @param       {String} Module path.
  * @return 		{Boolean} True if module loads.
  */
 let load = function (path) {
-	let instances = [];
+	let dependencies = [];
 	let module = require(path);
 	if (typeof module.main !== 'function') {
 
 		events.emit('warn','Module without main.');
 		return false;
 	}
-	//Simple
-	if (Array.isArray(module.$inject) && module.$inject.length > 0) {
-
-		for (let i = 0; i < module.$inject.length; i++) {
-
-			let mod = get(module.$inject[i])
-			if (mod === null) return false;
-			
-			instances.push(mod);
-		}
-
-		initialize(module.main, instances);
-	} else {
-		//Hard
-		return loadHard(path, module);
-	}
-	return true;
-}
-
-/**
- * @private
- * @description Inject modules from function params, and call it.
- * @param       {String} Module path.
- * @param       {Object}	Module instance.
- */
-let loadHard = function (path, module) {
-	let instances = [];
-
-	var list = getParamNames(module.main);
 	
+	var list = getParamNames(module);
+
 	for (let i = 0; i < list.length; i++) {
-		let mod = get(list[i]);
-		if (mod === null) return false;
-		instances.push(mod);
+
+		let dependency = get(list[i])
+		if (dependency === null) return false;
+		
+		dependencies.push(dependency);
 	}
 
-	initialize(module.main, instances);
+	initialize(module.main, dependencies);
+
 	return true;
 }
 

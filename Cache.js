@@ -23,7 +23,7 @@ class Cache {
 		}
 		
 		if (typeof $inject !== 'function') return out;
-		if (out.$inject) out.$inject = $inject;
+		if (!this.isClass && out.$inject) out.$inject = $inject;
 		return out;
 	}
 
