@@ -186,7 +186,7 @@ eloader.on('error', (err, res, path) => {
 **Note:** Default is false, so its try continue.
 
 ## **[Version](#eloader)**
-1.3.2
+1.4.2
 
 ## **[Author](#eloader)**
 Eliézer Augusto de Moraes Andrade

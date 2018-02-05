@@ -1,7 +1,7 @@
 /**
  * 	@description Loads directory modules and injects dependencies.
  * 	@author Eliézer Augusto de Moraes Andrade
- * 	@version 1.3.2
+ * 	@version 1.4.2
  */
 
 //TODO: Move eloader to class inheriting Events
